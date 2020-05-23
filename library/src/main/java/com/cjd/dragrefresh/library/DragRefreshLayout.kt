@@ -2,14 +2,10 @@ package com.cjd.dragrefresh.library
 
 import android.animation.ValueAnimator
 import android.content.Context
-import android.graphics.Color
 import android.util.AttributeSet
-import android.util.Log
-import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 
 /**
  * @author chenjidong
@@ -23,9 +19,19 @@ class DragRefreshLayout @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : ViewGroup(context, attributeSet, defStyleAttr) {
 
-    private lateinit var headerView: View
-    private lateinit var contentView: View
-    private lateinit var footerView: View
+    var headerView: View? = null
+        private set(value) {
+            field = value
+        }
+    var footerView: View? = null
+        private set(value) {
+            field = value
+        }
+    var contentView: View? = null
+        private set(value) {
+            field = value
+        }
+    var onDragUICallbackListener: ((isHeader: Boolean, view: View) -> Unit)? = null
 
     private var headerHeight = 0
     private var footerHeight = 0
@@ -34,6 +40,7 @@ class DragRefreshLayout @JvmOverloads constructor(
     private var downY = 0
     private var bottomFlag = false //用户下滑后 不松开触摸 且胡乱滑动时
     private var topFlag = false
+
 
     override fun onFinishInflate() {
         super.onFinishInflate()
@@ -46,53 +53,14 @@ class DragRefreshLayout @JvmOverloads constructor(
 
         if (child1 != null) {
             headerView = child1
-        } else {
-            headerView = TextView(context).apply {
-                this.isClickable = true
-                this.setTextColor(Color.BLACK)
-                this.gravity = Gravity.CENTER
-                this.textSize = 20f
-                this.text = "this is header view you"
-                this.setBackgroundColor(Color.BLUE)
-            }
-            addView(
-                headerView,
-                MarginLayoutParams(MarginLayoutParams.MATCH_PARENT, MarginLayoutParams.WRAP_CONTENT)
-            )
         }
 
         if (child2 != null) {
             contentView = child2
-        } else {
-            contentView = TextView(context).apply {
-                this.isClickable = true
-                this.setTextColor(Color.BLACK)
-                this.gravity = Gravity.CENTER
-                this.textSize = 20f
-                this.text = "this is content view you can try slide down or up"
-                this.setBackgroundColor(Color.RED)
-            }
-            addView(
-                contentView,
-                MarginLayoutParams(MarginLayoutParams.MATCH_PARENT, MarginLayoutParams.MATCH_PARENT)
-            )
         }
 
         if (child3 != null) {
             footerView = child3
-        } else {
-            footerView = TextView(context).apply {
-                this.isClickable = true
-                this.setTextColor(Color.BLACK)
-                this.gravity = Gravity.CENTER
-                this.textSize = 20f
-                this.text = "this is footer view you"
-                this.setBackgroundColor(Color.GREEN)
-            }
-            addView(
-                footerView,
-                MarginLayoutParams(MarginLayoutParams.MATCH_PARENT, MarginLayoutParams.WRAP_CONTENT)
-            )
         }
     }
 
@@ -100,13 +68,13 @@ class DragRefreshLayout @JvmOverloads constructor(
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
 
 
-        headerView.let {
+        headerView?.let {
             measureChildWithMargins(it, widthMeasureSpec, 0, heightMeasureSpec, 0)
             val lp = it.layoutParams as MarginLayoutParams
             headerHeight = it.measuredHeight + lp.topMargin + lp.bottomMargin
         }
 
-        contentView.let {
+        contentView?.let {
             val lp = it.layoutParams as MarginLayoutParams
             val childWidthMeasureSpec = getChildMeasureSpec(
                 widthMeasureSpec,
@@ -122,7 +90,7 @@ class DragRefreshLayout @JvmOverloads constructor(
             it.measure(childWidthMeasureSpec, childHeightMeasureSpec)
         }
 
-        footerView.let {
+        footerView?.let {
             measureChildWithMargins(it, widthMeasureSpec, 0, heightMeasureSpec, 0)
             val lp = it.layoutParams as MarginLayoutParams
             footerHeight = it.measuredHeight + lp.topMargin + lp.bottomMargin
@@ -132,7 +100,7 @@ class DragRefreshLayout @JvmOverloads constructor(
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
 
-        headerView.let {
+        headerView?.let {
             val lp = it.layoutParams as MarginLayoutParams
             val left = paddingLeft + lp.leftMargin
             val top = paddingTop + lp.topMargin + offsetTopY - headerHeight
@@ -142,7 +110,7 @@ class DragRefreshLayout @JvmOverloads constructor(
             it.layout(left, top, right, bottom)
         }
 
-        contentView.let {
+        contentView?.let {
             val lp = it.layoutParams as MarginLayoutParams
             val left = paddingLeft + lp.leftMargin
             val top = paddingTop + lp.topMargin + offsetTopY
@@ -152,7 +120,7 @@ class DragRefreshLayout @JvmOverloads constructor(
             it.layout(left, top, right, bottom)
         }
 
-        footerView.let {
+        footerView?.let {
             val lp = it.layoutParams as MarginLayoutParams
             val left = paddingLeft + lp.leftMargin
             val top = height - offsetBottomY
@@ -186,13 +154,13 @@ class DragRefreshLayout @JvmOverloads constructor(
         when (ev.action) {
             MotionEvent.ACTION_DOWN -> {
                 downY = ev.y.toInt()
-                //TODO 避免后续 MOVE 和 UP 无法响应
+                //TODO 避免后续 MOVE 和 UP /子view 无法响应
                 super.dispatchTouchEvent(ev)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
                 val moveY = ev.y.toInt()
-                Log.d("--->", "$downY $moveY")
+                DragLogUtil.d("$downY $moveY")
                 if (downY < moveY) {
                     if (bottomFlag) {//上拉动作成立后 再次上拉时取消下拉动作
                         bottomFlag = false
@@ -200,16 +168,19 @@ class DragRefreshLayout @JvmOverloads constructor(
                         return super.dispatchTouchEvent(ev)
                     }
 
-                    if (!contentView.canScrollVertically(-1) || topFlag) {//内容view 滚动到顶部
+                    headerView?.let { head ->
+                        contentView?.let {
+                            if (!canScrollVertically(it, -1) || topFlag) {//内容view 滚动到顶部
+                                if (!topFlag)
+                                    topFlag = true
 
-                        if (!topFlag)
-                            topFlag = true
+                                val distanceY = moveY - downY
 
-                        val distanceY = moveY - downY
-
-                        offsetTopY = distanceY
-                        requestLayout()
-                        return true
+                                offsetTopY = distanceY
+                                requestLayout()
+                                return true
+                            }
+                        }
                     }
 
                 } else {
@@ -219,12 +190,16 @@ class DragRefreshLayout @JvmOverloads constructor(
                         return super.dispatchTouchEvent(ev)
                     }
 
-                    if (!contentView.canScrollVertically(1) || bottomFlag) {//滚动到底部
-                        if (!bottomFlag)
-                            bottomFlag = true
-                        offsetBottomY = downY - moveY
-                        requestLayout()
-                        return true
+                    footerView?.let { footer ->
+                        contentView?.let {
+                            if (!canScrollVertically(it, 1) || bottomFlag) {//滚动到底部
+                                if (!bottomFlag)
+                                    bottomFlag = true
+                                offsetBottomY = downY - moveY
+                                requestLayout()
+                                return true
+                            }
+                        }
                     }
                 }
             }
@@ -232,47 +207,47 @@ class DragRefreshLayout @JvmOverloads constructor(
             MotionEvent.ACTION_UP and MotionEvent.ACTION_CANCEL -> {
                 val moveY = ev.y.toInt()
                 if (downY < moveY) {//往下拉
+                    headerView?.let { head ->
+                        contentView?.let {
+                            if (!canScrollVertically(it, -1) || topFlag) {
+                                val distanceY = moveY - downY
 
-                    if (!contentView.canScrollVertically(-1) || topFlag) {
-                        val distanceY = moveY - downY
+                                offsetTopY = if (offsetTopY > headerHeight) { //下拉不超过head height 则隐藏
+                                    onDragUICallbackListener?.invoke(true, head)
+                                    headerHeight
+                                } else 0
 
-                        offsetTopY = if (offsetTopY > headerHeight) { //下拉不超过head height 则隐藏
-                            headerHeight
-                        } else 0
-
-                        if (distanceY > offsetTopY)
-                            startValueAnimator(true, distanceY, offsetTopY)
-
-                        if (topFlag)
-                            topFlag = false
-
-                        //TODO 完成刷新
-                        completePullDownRefresh()
+                                if (distanceY > offsetTopY)
+                                    startValueAnimator(true, distanceY, offsetTopY)
+                                if (topFlag)
+                                    topFlag = false
+                            }
+                        }
                     }
                 } else {//往上拉
 
-                    if (!contentView.canScrollVertically(1) || bottomFlag) {
-                        val distanceY = downY - moveY
+                    footerView?.let { footer ->
+                        contentView?.let {
+                            if (!canScrollVertically(it, 1) || bottomFlag) {
+                                val distanceY = downY - moveY
 
-                        offsetBottomY = if (offsetBottomY > footerHeight) {
-                            footerHeight
-                        } else 0
+                                offsetBottomY = if (offsetBottomY > footerHeight) {
+                                    onDragUICallbackListener?.invoke(false, footer)
 
-                        if (distanceY > offsetBottomY)
-                            startValueAnimator(false, distanceY, offsetBottomY)
-                        if (bottomFlag)
-                            bottomFlag = false
+                                    footerHeight
+                                } else 0
 
-                        //TODO 完成刷新
-                        completePullUpRefresh()
+                                if (distanceY > offsetBottomY)
+                                    startValueAnimator(false, distanceY, offsetBottomY)
+                                if (bottomFlag)
+                                    bottomFlag = false
+                            }
+                        }
+
                     }
                 }
             }
         }
-        Log.d(
-            "--->",
-            "${contentView.canScrollVertically(-1)} ${contentView.canScrollVertically(1)} $topFlag $bottomFlag"
-        )
         return super.dispatchTouchEvent(ev)
     }
 
@@ -284,30 +259,94 @@ class DragRefreshLayout @JvmOverloads constructor(
         return super.onTouchEvent(ev)
     }
 
+
+    fun setHeader(headerView: View) {
+        this.headerView?.let {
+            if (it != headerView) {
+                removeView(it)
+            }
+        }
+        this.headerView = headerView
+        addView(
+            this.headerView,
+            MarginLayoutParams(MarginLayoutParams.MATCH_PARENT, MarginLayoutParams.WRAP_CONTENT)
+        )
+    }
+
+    fun setContent(contentView: View) {
+        this.contentView?.let {
+            if (it != contentView) {
+                removeView(it)
+            }
+        }
+        this.contentView = contentView
+        addView(
+            this.contentView,
+            MarginLayoutParams(MarginLayoutParams.MATCH_PARENT, MarginLayoutParams.MATCH_PARENT)
+        )
+    }
+
+    fun setFooter(footerView: View) {
+        this.footerView?.let {
+            if (it != footerView) {
+                removeView(it)
+            }
+        }
+        this.footerView = footerView
+        addView(
+            this.footerView,
+            MarginLayoutParams(MarginLayoutParams.MATCH_PARENT, MarginLayoutParams.WRAP_CONTENT)
+        )
+    }
+
+    /**
+     * finish drag all refresh
+     */
+    fun completeRefresh(delayMillis: Long = 3000, duration: Long = 500) {
+        if (offsetBottomY != 0)
+            completePullUpRefresh(delayMillis, duration)
+
+        if (offsetTopY != 0)
+            completePullDownRefresh(delayMillis, duration)
+    }
+
+    /**
+     * finish drag down refresh
+     */
     fun completePullDownRefresh(delayMillis: Long = 3000, duration: Long = 500) {
         postDelayed({
             startValueAnimator(true, offsetTopY, 0, duration)
         }, delayMillis)
     }
 
+    /**
+     * finish drag up refresh
+     */
     fun completePullUpRefresh(delayMillis: Long = 3000, duration: Long = 500) {
         postDelayed({
             startValueAnimator(false, offsetBottomY, 0, duration)
         }, delayMillis)
     }
 
+    private fun canScrollVertically(view: View, direction: Int): Boolean {
+        return view.canScrollVertically(direction)
+    }
+
+
     private fun startValueAnimator(isTop: Boolean, start: Int, end: Int, duration: Long = 500) {
-        ValueAnimator.ofInt(start, end).apply {
-            this.addUpdateListener {
-                val value = it.animatedValue as Int
-                if (isTop) {
-                    offsetTopY = value
-                } else
-                    offsetBottomY = value
-                requestLayout()
+        if (start != end) {
+            ValueAnimator.ofInt(start, end).apply {
+                this.addUpdateListener {
+                    val value = it.animatedValue as Int
+                    if (isTop) {
+                        offsetTopY = value
+                    } else
+                        offsetBottomY = value
+                    requestLayout()
+                }
+                this.duration = duration
+                this.start()
             }
-            this.duration = duration
-            this.start()
         }
     }
 }
