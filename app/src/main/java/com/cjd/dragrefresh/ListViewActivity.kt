@@ -8,6 +8,8 @@ import android.view.ViewGroup
 import android.widget.BaseAdapter
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import com.cjd.dragrefresh.library.DragRefreshLayout
+import com.cjd.dragrefresh.library.OnDragUICallback
 import kotlinx.android.synthetic.main.activity_list_view.*
 
 /**
@@ -26,8 +28,12 @@ class ListViewActivity : AppCompatActivity() {
             list.add("item $index")
         }
         lv_content.adapter = Adapter(this, list)
-        layout.onDragUICallbackListener = { isHeader, view ->
-            layout?.completeRefresh()
+        layout.onDragUICallback = object : OnDragUICallback {
+            override fun onCallback( view: View, state: Int, moveY: Int) {
+                if (state == DragRefreshLayout.DRAG_UI_STATE_FINISH)
+                    layout?.completeRefresh()
+            }
+
         }
     }
 

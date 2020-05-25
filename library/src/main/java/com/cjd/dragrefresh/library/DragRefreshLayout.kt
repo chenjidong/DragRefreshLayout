@@ -19,6 +19,14 @@ class DragRefreshLayout @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : ViewGroup(context, attributeSet, defStyleAttr) {
 
+    companion object {
+        const val DRAG_UI_STATE_BEGIN = 0
+        const val DRAG_UI_STATE_DRAGGING = 1
+        const val DRAG_UI_STATE_FINISH = 2
+        const val DRAG_UI_STATE_CANCEL = -1
+    }
+
+
     var headerView: View? = null
         private set(value) {
             field = value
@@ -31,15 +39,16 @@ class DragRefreshLayout @JvmOverloads constructor(
         private set(value) {
             field = value
         }
-    var onDragUICallbackListener: ((isHeader: Boolean, view: View) -> Unit)? = null
+
+    var onDragUICallback: OnDragUICallback? = null
 
     private var headerHeight = 0
     private var footerHeight = 0
     private var offsetTopY = 0
     private var offsetBottomY = 0
-    private var downY = 0
-    private var bottomFlag = false //用户下滑后 不松开触摸 且胡乱滑动时
-    private var topFlag = false
+    private var lastDownY = 0
+    private var touchTopFlag = false //用户下滑后 不松开触摸 且胡乱滑动时
+    private var touchBottomFlag = false //同上
 
 
     override fun onFinishInflate() {
@@ -153,98 +162,30 @@ class DragRefreshLayout @JvmOverloads constructor(
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         when (ev.action) {
             MotionEvent.ACTION_DOWN -> {
-                downY = ev.y.toInt()
+                lastDownY = ev.y.toInt()
                 //TODO 避免后续 MOVE 和 UP /子view 无法响应
                 super.dispatchTouchEvent(ev)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
                 val moveY = ev.y.toInt()
-                DragLogUtil.d("$downY $moveY")
-                if (downY < moveY) {
-                    if (bottomFlag) {//上拉动作成立后 再次上拉时取消下拉动作
-                        bottomFlag = false
-                        completePullUpRefresh(0, 0)
+                if (lastDownY < moveY) {
+                    if (checkTouchDirection(true))
                         return super.dispatchTouchEvent(ev)
-                    }
-
-                    headerView?.let { head ->
-                        contentView?.let {
-                            if (!canScrollVertically(it, -1) || topFlag) {//内容view 滚动到顶部
-                                if (!topFlag)
-                                    topFlag = true
-
-                                val distanceY = moveY - downY
-
-                                offsetTopY = distanceY
-                                requestLayout()
-                                return true
-                            }
-                        }
-                    }
-
+                    dragDown(ev)
                 } else {
-                    if (topFlag) {//下拉动作成立后 再次上拉时取消下拉动作
-                        topFlag = false
-                        completePullDownRefresh(0, 0)
+                    if (checkTouchDirection(false))
                         return super.dispatchTouchEvent(ev)
-                    }
-
-                    footerView?.let { footer ->
-                        contentView?.let {
-                            if (!canScrollVertically(it, 1) || bottomFlag) {//滚动到底部
-                                if (!bottomFlag)
-                                    bottomFlag = true
-                                offsetBottomY = downY - moveY
-                                requestLayout()
-                                return true
-                            }
-                        }
-                    }
+                    dragUp(ev)
                 }
             }
 
             MotionEvent.ACTION_UP and MotionEvent.ACTION_CANCEL -> {
                 val moveY = ev.y.toInt()
-                if (downY < moveY) {//往下拉
-                    headerView?.let { head ->
-                        contentView?.let {
-                            if (!canScrollVertically(it, -1) || topFlag) {
-                                val distanceY = moveY - downY
-
-                                offsetTopY = if (offsetTopY > headerHeight) { //下拉不超过head height 则隐藏
-                                    onDragUICallbackListener?.invoke(true, head)
-                                    headerHeight
-                                } else 0
-
-                                if (distanceY > offsetTopY)
-                                    startValueAnimator(true, distanceY, offsetTopY)
-                                if (topFlag)
-                                    topFlag = false
-                            }
-                        }
-                    }
-                } else {//往上拉
-
-                    footerView?.let { footer ->
-                        contentView?.let {
-                            if (!canScrollVertically(it, 1) || bottomFlag) {
-                                val distanceY = downY - moveY
-
-                                offsetBottomY = if (offsetBottomY > footerHeight) {
-                                    onDragUICallbackListener?.invoke(false, footer)
-
-                                    footerHeight
-                                } else 0
-
-                                if (distanceY > offsetBottomY)
-                                    startValueAnimator(false, distanceY, offsetBottomY)
-                                if (bottomFlag)
-                                    bottomFlag = false
-                            }
-                        }
-
-                    }
+                if (lastDownY < moveY) {
+                    dragDownFinish(ev)
+                } else {
+                    dragUpFinish(ev)
                 }
             }
         }
@@ -259,7 +200,10 @@ class DragRefreshLayout @JvmOverloads constructor(
         return super.onTouchEvent(ev)
     }
 
-
+    /**
+     * 设置 header 默认高度为wrap_content
+     * @param headerView 自定义view
+     */
     fun setHeader(headerView: View) {
         this.headerView?.let {
             if (it != headerView) {
@@ -273,6 +217,10 @@ class DragRefreshLayout @JvmOverloads constructor(
         )
     }
 
+    /**
+     * 设置 content 默认高度为 MATCH_PARENT
+     * @param contentView 自定义view
+     */
     fun setContent(contentView: View) {
         this.contentView?.let {
             if (it != contentView) {
@@ -286,6 +234,10 @@ class DragRefreshLayout @JvmOverloads constructor(
         )
     }
 
+    /**
+     * 设置 content 默认高度为 WRAP_CONTENT
+     * @param footerView 自定义view
+     */
     fun setFooter(footerView: View) {
         this.footerView?.let {
             if (it != footerView) {
@@ -300,7 +252,7 @@ class DragRefreshLayout @JvmOverloads constructor(
     }
 
     /**
-     * finish drag all refresh
+     * 完成 header 和 footer 隐藏
      */
     fun completeRefresh(delayMillis: Long = 3000, duration: Long = 500) {
         if (offsetBottomY != 0)
@@ -311,7 +263,9 @@ class DragRefreshLayout @JvmOverloads constructor(
     }
 
     /**
-     * finish drag down refresh
+     * 完成下拉刷新
+     * @param delayMillis 延迟时间 单位毫秒
+     * @param duration 动画时间
      */
     fun completePullDownRefresh(delayMillis: Long = 3000, duration: Long = 500) {
         postDelayed({
@@ -320,7 +274,9 @@ class DragRefreshLayout @JvmOverloads constructor(
     }
 
     /**
-     * finish drag up refresh
+     * 完成上拉刷新
+     * @param delayMillis 延迟时间 单位毫秒
+     * @param duration 动画时间
      */
     fun completePullUpRefresh(delayMillis: Long = 3000, duration: Long = 500) {
         postDelayed({
@@ -328,11 +284,157 @@ class DragRefreshLayout @JvmOverloads constructor(
         }, delayMillis)
     }
 
+    /**
+     * 向下拖拽
+     * @param ev touch 对象
+     */
+    private fun dragDown(ev: MotionEvent): Boolean {
+        headerView?.let { head ->
+            contentView?.let {
+                if (!canScrollVertically(it, -1) || touchTopFlag) {//内容view 滚动到顶部
+                    val moveY = ev.y.toInt()
+                    val distanceY = moveY - lastDownY
+                    if (!touchTopFlag) {
+                        lastDownY = moveY
+                        touchTopFlag = true
+                        onDragUICallback?.onCallback(head, DRAG_UI_STATE_BEGIN, distanceY)
+                    } else
+                        onDragUICallback?.onCallback(head, DRAG_UI_STATE_DRAGGING, distanceY)
+
+                    offsetTopY = distanceY
+
+                    requestLayout()
+                    return true
+                }
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    /**
+     * 向下拖拽 完成 或者取消时 （触摸抬起） 拖拽范围超出 header 高度 则显示 否则动画隐藏
+     * @param ev touch 对象
+     */
+    private fun dragDownFinish(ev: MotionEvent) {
+        headerView?.let { head ->
+            contentView?.let {
+                if (!canScrollVertically(it, -1) || touchTopFlag) {
+                    val moveY = ev.y.toInt()
+                    val distanceY = moveY - lastDownY
+
+                    offsetTopY = if (offsetTopY > headerHeight) { //下拉不超过head height 则隐藏
+                        onDragUICallback?.onCallback(head, DRAG_UI_STATE_FINISH, distanceY)
+                        headerHeight
+                    } else {
+                        onDragUICallback?.onCallback(head, DRAG_UI_STATE_CANCEL, distanceY)
+                        0
+                    }
+
+                    if (touchTopFlag)
+                        touchTopFlag = false
+
+                    if (distanceY > offsetTopY)
+                        startValueAnimator(true, distanceY, offsetTopY)
+
+                }
+            }
+        }
+    }
+
+    /**
+     * 向上拖拽
+     * @param ev touch 对象
+     */
+    private fun dragUp(ev: MotionEvent): Boolean {
+        footerView?.let { footer ->
+            contentView?.let {
+                if (!canScrollVertically(it, 1) || touchBottomFlag) {//滚动到底部
+                    val moveY = ev.y.toInt()
+                    val distanceY = lastDownY - moveY
+                    if (!touchBottomFlag) {
+                        lastDownY = moveY
+                        touchBottomFlag = true
+
+                        onDragUICallback?.onCallback(footer, DRAG_UI_STATE_BEGIN, distanceY)
+                    } else
+                        onDragUICallback?.onCallback(footer, DRAG_UI_STATE_DRAGGING, distanceY)
+
+                    offsetBottomY = distanceY
+                    requestLayout()
+                    return true
+                }
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    /**
+     * 向上拖拽 完成 或者取消时 （触摸抬起） 拖拽范围超出 footer 高度 则显示 否则动画隐藏
+     * @param ev touch 对象
+     */
+    private fun dragUpFinish(ev: MotionEvent) {
+        footerView?.let { footer ->
+            contentView?.let {
+                if (!canScrollVertically(it, 1) || touchBottomFlag) {
+                    val moveY = ev.y.toInt()
+                    val distanceY = lastDownY - moveY
+
+                    offsetBottomY = if (offsetBottomY > footerHeight) {
+                        onDragUICallback?.onCallback(footer, DRAG_UI_STATE_FINISH, distanceY)
+                        footerHeight
+                    } else {
+                        onDragUICallback?.onCallback(footer, DRAG_UI_STATE_CANCEL, distanceY)
+                        0
+                    }
+
+                    if (touchBottomFlag)
+                        touchBottomFlag = false
+
+                    if (distanceY > offsetBottomY)
+                        startValueAnimator(false, distanceY, offsetBottomY)
+                }
+            }
+
+        }
+    }
+
+    /**
+     * 检查触摸方向  （按住屏幕时 下拉 然后在上拉 需要恢复 header 高度）
+     * @param isTop true 下拉  false 上拉
+     */
+    private fun checkTouchDirection(isTop: Boolean): Boolean {
+        if (isTop) {
+            if (touchBottomFlag) {//上拉动作成立后 再次上拉时取消下拉动作
+                completePullUpRefresh(0, 0)
+                touchBottomFlag = false
+                return true
+            }
+        } else {
+            if (touchTopFlag) {//下拉动作成立后 再次上拉时取消下拉动作
+                completePullDownRefresh(0, 0)
+                touchTopFlag = false
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * 检查 view 是否滚动到底部或顶部
+     * @param view 要检查的view
+     * @param direction < 0 顶部  > 0 底部
+     */
     private fun canScrollVertically(view: View, direction: Int): Boolean {
         return view.canScrollVertically(direction)
     }
 
-
+    /**
+     * 属性动画，用于恢复 header 或 footer
+     * @param isTop true header  false footer
+     * @param start y 轴 起始点
+     * @param end y 轴终点
+     * @param duration 动画世界
+     */
     private fun startValueAnimator(isTop: Boolean, start: Int, end: Int, duration: Long = 500) {
         if (start != end) {
             ValueAnimator.ofInt(start, end).apply {

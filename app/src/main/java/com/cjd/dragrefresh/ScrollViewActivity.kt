@@ -1,7 +1,10 @@
 package com.cjd.dragrefresh
 
 import android.os.Bundle
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import com.cjd.dragrefresh.library.DragRefreshLayout
+import com.cjd.dragrefresh.library.OnDragUICallback
 import kotlinx.android.synthetic.main.activity_scroll_view.*
 
 /**
@@ -16,8 +19,11 @@ class ScrollViewActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_scroll_view)
 
-        layout.onDragUICallbackListener = { isHeader, view ->
-            layout?.completeRefresh()
+        layout.onDragUICallback = object : OnDragUICallback {
+            override fun onCallback(view: View, state: Int, moveY: Int) {
+                if (state == DragRefreshLayout.DRAG_UI_STATE_FINISH)
+                    layout?.completeRefresh()
+            }
         }
     }
 }

@@ -8,8 +8,10 @@ import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.cjd.dragrefresh.library.DragLogUtil
+import com.cjd.dragrefresh.library.DragRefreshLayout
+import com.cjd.dragrefresh.library.OnDragUICallback
 import kotlinx.android.synthetic.main.activity_recycler_view.*
-import kotlinx.android.synthetic.main.activity_scroll_view.*
 import kotlinx.android.synthetic.main.activity_scroll_view.layout
 import kotlinx.android.synthetic.main.recycler_item_view.view.*
 
@@ -30,8 +32,13 @@ class RecyclerViewActivity : AppCompatActivity() {
             list.add("item $index")
         }
         rv_content.adapter = Adapter(this, list)
-        layout.onDragUICallbackListener = { isHeader, view ->
-            layout?.completeRefresh()
+        layout.onDragUICallback = object : OnDragUICallback {
+            override fun onCallback(view: View, state: Int, moveY: Int) {
+                DragLogUtil.d("$state $moveY")
+                if (state == DragRefreshLayout.DRAG_UI_STATE_FINISH)
+                    layout?.completeRefresh()
+            }
+
         }
     }
 

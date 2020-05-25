@@ -10,8 +10,10 @@ import android.view.View
  */
 interface OnDragUICallback {
 
-    fun onHeaderRefresh(header: View)
-
-    fun onFooterRefresh(footer: View)
-
+    /**
+     * @param view  header or footer view
+     * @param state 拖拽状态
+     * @param moveY y轴
+     */
+    fun onCallback(view: View, state: Int, moveY: Int)
 }
