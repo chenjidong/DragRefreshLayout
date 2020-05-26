@@ -40,7 +40,7 @@ class DragRefreshLayout @JvmOverloads constructor(
             field = value
         }
 
-    var onDragUICallback: OnDragUICallback? = null
+    private val dragUICallbacks = mutableListOf<OnDragUICallback>()
 
     private var headerHeight = 0
     private var footerHeight = 0
@@ -60,17 +60,23 @@ class DragRefreshLayout @JvmOverloads constructor(
         val child2 = getChildAt(1)
         val child3 = getChildAt(2)
 
-        if (child1 != null) {
+        if (child1 != null && childCount > 1) {
             headerView = child1
         }
 
         if (child2 != null) {
             contentView = child2
-        }
+        } else if (child1 != null && childCount == 1)
+            contentView = child1
 
         if (child3 != null) {
             footerView = child3
         }
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        dragUICallbacks.clear()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -201,6 +207,14 @@ class DragRefreshLayout @JvmOverloads constructor(
     }
 
     /**
+     * 添加 刷新回调
+     * @param onDragUICallback obj
+     */
+    fun addDragUICallback(onDragUICallback: OnDragUICallback) {
+        dragUICallbacks.add(onDragUICallback)
+    }
+
+    /**
      * 设置 header 默认高度为wrap_content
      * @param headerView 自定义view
      */
@@ -297,9 +311,9 @@ class DragRefreshLayout @JvmOverloads constructor(
                     if (!touchTopFlag) {
                         lastDownY = moveY
                         touchTopFlag = true
-                        onDragUICallback?.onCallback(head, DRAG_UI_STATE_BEGIN, distanceY)
+                        notifyCallbacks(head, DRAG_UI_STATE_BEGIN, distanceY)
                     } else
-                        onDragUICallback?.onCallback(head, DRAG_UI_STATE_DRAGGING, distanceY)
+                        notifyCallbacks(head, DRAG_UI_STATE_DRAGGING, distanceY)
 
                     offsetTopY = distanceY
 
@@ -323,10 +337,10 @@ class DragRefreshLayout @JvmOverloads constructor(
                     val distanceY = moveY - lastDownY
 
                     offsetTopY = if (offsetTopY > headerHeight) { //下拉不超过head height 则隐藏
-                        onDragUICallback?.onCallback(head, DRAG_UI_STATE_FINISH, distanceY)
+                        notifyCallbacks(head, DRAG_UI_STATE_FINISH, distanceY)
                         headerHeight
                     } else {
-                        onDragUICallback?.onCallback(head, DRAG_UI_STATE_CANCEL, distanceY)
+                        notifyCallbacks(head, DRAG_UI_STATE_CANCEL, distanceY)
                         0
                     }
 
@@ -355,9 +369,9 @@ class DragRefreshLayout @JvmOverloads constructor(
                         lastDownY = moveY
                         touchBottomFlag = true
 
-                        onDragUICallback?.onCallback(footer, DRAG_UI_STATE_BEGIN, distanceY)
+                        notifyCallbacks(footer, DRAG_UI_STATE_BEGIN, distanceY)
                     } else
-                        onDragUICallback?.onCallback(footer, DRAG_UI_STATE_DRAGGING, distanceY)
+                        notifyCallbacks(footer, DRAG_UI_STATE_DRAGGING, distanceY)
 
                     offsetBottomY = distanceY
                     requestLayout()
@@ -380,10 +394,10 @@ class DragRefreshLayout @JvmOverloads constructor(
                     val distanceY = lastDownY - moveY
 
                     offsetBottomY = if (offsetBottomY > footerHeight) {
-                        onDragUICallback?.onCallback(footer, DRAG_UI_STATE_FINISH, distanceY)
+                        notifyCallbacks(footer, DRAG_UI_STATE_FINISH, distanceY)
                         footerHeight
                     } else {
-                        onDragUICallback?.onCallback(footer, DRAG_UI_STATE_CANCEL, distanceY)
+                        notifyCallbacks(footer, DRAG_UI_STATE_CANCEL, distanceY)
                         0
                     }
 
@@ -449,6 +463,15 @@ class DragRefreshLayout @JvmOverloads constructor(
                 this.duration = duration
                 this.start()
             }
+        }
+    }
+
+    /**
+     * 下/上拉刷新回调
+     */
+    private fun notifyCallbacks(view: View, state: Int, moveY: Int) {
+        dragUICallbacks.forEach {
+            it.onCallback(view, state, moveY)
         }
     }
 }

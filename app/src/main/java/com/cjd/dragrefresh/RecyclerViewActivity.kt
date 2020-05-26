@@ -21,7 +21,7 @@ import kotlinx.android.synthetic.main.recycler_item_view.view.*
  * created 2020/5/22/0022
  * description
  */
-class RecyclerViewActivity : AppCompatActivity() {
+class RecyclerViewActivity : AppCompatActivity(), OnDragUICallback {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,14 +32,7 @@ class RecyclerViewActivity : AppCompatActivity() {
             list.add("item $index")
         }
         rv_content.adapter = Adapter(this, list)
-        layout.onDragUICallback = object : OnDragUICallback {
-            override fun onCallback(view: View, state: Int, moveY: Int) {
-                DragLogUtil.d("$state $moveY")
-                if (state == DragRefreshLayout.DRAG_UI_STATE_FINISH)
-                    layout?.completeRefresh()
-            }
-
-        }
+        layout.addDragUICallback(this)
     }
 
 
@@ -63,5 +56,11 @@ class RecyclerViewActivity : AppCompatActivity() {
 
     class RecyclerViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
 
+    }
+
+    override fun onCallback(view: View, state: Int, moveY: Int) {
+        DragLogUtil.d("$state $moveY")
+        if (state == DragRefreshLayout.DRAG_UI_STATE_FINISH)
+            layout?.completeRefresh()
     }
 }

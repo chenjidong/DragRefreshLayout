@@ -13,18 +13,17 @@ import kotlinx.android.synthetic.main.activity_not_scroll_view.*
  * created 2020/5/22/0022
  * description
  */
-class NotScrollViewActivity : AppCompatActivity() {
+class NotScrollViewActivity : AppCompatActivity(),OnDragUICallback {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_not_scroll_view)
 
-        layout.onDragUICallback = object : OnDragUICallback {
-            override fun onCallback(view: View, state: Int, moveY: Int) {
-                if (state == DragRefreshLayout.DRAG_UI_STATE_FINISH)
-                    layout?.completeRefresh()
-            }
+        layout.addDragUICallback(this)
+    }
 
-        }
+    override fun onCallback(view: View, state: Int, moveY: Int) {
+        if (state == DragRefreshLayout.DRAG_UI_STATE_FINISH)
+            layout?.completeRefresh()
     }
 }

@@ -18,7 +18,7 @@ import kotlinx.android.synthetic.main.activity_list_view.*
  * created 2020/5/22/0022
  * description
  */
-class ListViewActivity : AppCompatActivity() {
+class ListViewActivity : AppCompatActivity(), OnDragUICallback {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,13 +28,7 @@ class ListViewActivity : AppCompatActivity() {
             list.add("item $index")
         }
         lv_content.adapter = Adapter(this, list)
-        layout.onDragUICallback = object : OnDragUICallback {
-            override fun onCallback( view: View, state: Int, moveY: Int) {
-                if (state == DragRefreshLayout.DRAG_UI_STATE_FINISH)
-                    layout?.completeRefresh()
-            }
-
-        }
+        layout.addDragUICallback(this)
     }
 
 
@@ -53,6 +47,11 @@ class ListViewActivity : AppCompatActivity() {
         }
 
         override fun getCount(): Int = list.size
+    }
+
+    override fun onCallback(view: View, state: Int, moveY: Int) {
+        if (state == DragRefreshLayout.DRAG_UI_STATE_FINISH)
+            layout?.completeRefresh()
     }
 
 
