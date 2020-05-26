@@ -176,12 +176,12 @@ class DragRefreshLayout @JvmOverloads constructor(
             MotionEvent.ACTION_MOVE -> {
                 val moveY = ev.y.toInt()
                 if (lastDownY < moveY) {
-                    if (checkTouchDirection(true))
-                        return super.dispatchTouchEvent(ev)
+                    /*if (checkTouchDirection(true))
+                        return super.dispatchTouchEvent(ev)*/
                     dragDown(ev)
                 } else {
-                    if (checkTouchDirection(false))
-                        return super.dispatchTouchEvent(ev)
+                   /* if (checkTouchDirection(false))
+                        return super.dispatchTouchEvent(ev)*/
                     dragUp(ev)
                 }
             }
@@ -306,9 +306,11 @@ class DragRefreshLayout @JvmOverloads constructor(
         headerView?.let { head ->
             contentView?.let {
                 if (!canScrollVertically(it, -1) || touchTopFlag) {//内容view 滚动到顶部
+                    DragLogUtil.d("$lastDownY")
                     val moveY = ev.y.toInt()
-                    val distanceY = moveY - lastDownY
+                    var distanceY = moveY - lastDownY
                     if (!touchTopFlag) {
+                        distanceY = 0 //避免绘制闪烁
                         lastDownY = moveY
                         touchTopFlag = true
                         notifyCallbacks(head, DRAG_UI_STATE_BEGIN, distanceY)
