@@ -16,5 +16,5 @@ Android pull down or pull up refresh
 # Step 2. Add the dependency
 
 	dependencies {
-	       implementation 'com.github.chenjidong:DragRefreshLayout:1.0.0'
+	       implementation 'com.github.chenjidong:DragRefreshLayout:2.0.0'
 	}
