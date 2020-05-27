@@ -176,12 +176,12 @@ class DragRefreshLayout @JvmOverloads constructor(
             MotionEvent.ACTION_MOVE -> {
                 val moveY = ev.y.toInt()
                 if (lastDownY < moveY) {
-                    /*if (checkTouchDirection(true))
-                        return super.dispatchTouchEvent(ev)*/
+                    if (checkTouchDirection(true))
+                        return super.dispatchTouchEvent(ev)
                     dragDown(ev)
                 } else {
-                   /* if (checkTouchDirection(false))
-                        return super.dispatchTouchEvent(ev)*/
+                    if (checkTouchDirection(false))
+                        return super.dispatchTouchEvent(ev)
                     dragUp(ev)
                 }
             }
