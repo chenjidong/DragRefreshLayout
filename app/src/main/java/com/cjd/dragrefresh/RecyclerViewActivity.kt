@@ -59,7 +59,7 @@ class RecyclerViewActivity : AppCompatActivity(), OnDragUICallback {
     }
 
     override fun onCallback(view: View, state: Int, moveY: Int) {
-        DragLogUtil.d("$state $moveY")
+        DragLogUtil.d("state:$state move:$moveY")
         if (state == DragRefreshLayout.DRAG_UI_STATE_FINISH)
             layout?.completeRefresh()
     }

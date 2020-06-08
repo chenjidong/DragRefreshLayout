@@ -49,7 +49,9 @@ class DragRefreshLayout @JvmOverloads constructor(
     private var lastDownY = 0
     private var touchTopFlag = false //用户下滑后 不松开触摸 且胡乱滑动时
     private var touchBottomFlag = false //同上
-
+    private var totalDistanceY = 0
+    private var lastMoveY = 0
+    private var valueAnimator: ValueAnimator? = null
 
     override fun onFinishInflate() {
         super.onFinishInflate()
@@ -77,6 +79,7 @@ class DragRefreshLayout @JvmOverloads constructor(
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         dragUICallbacks.clear()
+        valueAnimator?.cancel()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -166,15 +169,20 @@ class DragRefreshLayout @JvmOverloads constructor(
 
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (!isEnabled)
+            return super.dispatchTouchEvent(ev)
         when (ev.action) {
             MotionEvent.ACTION_DOWN -> {
                 lastDownY = ev.y.toInt()
+                lastMoveY = 0
                 //TODO 避免后续 MOVE 和 UP /子view 无法响应
                 super.dispatchTouchEvent(ev)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
                 val moveY = ev.y.toInt()
+//                DragLogUtil.d("---> move $moveY lastMoveY $lastMoveY  top: ${headerView?.top} top: ${contentView?.top}")
+
                 if (lastDownY < moveY) {
                     if (checkTouchDirection(true))
                         return super.dispatchTouchEvent(ev)
@@ -184,13 +192,13 @@ class DragRefreshLayout @JvmOverloads constructor(
                         return super.dispatchTouchEvent(ev)
                     dragUp(ev)
                 }
+                lastMoveY = moveY
             }
 
             MotionEvent.ACTION_UP and MotionEvent.ACTION_CANCEL -> {
                 val moveY = ev.y.toInt()
-                if (lastDownY < moveY) {
-                    dragDownFinish(ev)
-                } else {
+                dragDownFinish(ev)
+                if (lastDownY > moveY) {
                     dragUpFinish(ev)
                 }
             }
@@ -272,8 +280,9 @@ class DragRefreshLayout @JvmOverloads constructor(
         if (offsetBottomY != 0)
             completePullUpRefresh(delayMillis, duration)
 
-        if (offsetTopY != 0)
+        if (totalDistanceY > 0)
             completePullDownRefresh(delayMillis, duration)
+
     }
 
     /**
@@ -283,7 +292,11 @@ class DragRefreshLayout @JvmOverloads constructor(
      */
     fun completePullDownRefresh(delayMillis: Long = 3000, duration: Long = 500) {
         postDelayed({
-            startValueAnimator(true, offsetTopY, 0, duration)
+            if (totalDistanceY > 0) {
+                headerView?.offsetTopAndBottom(-totalDistanceY)
+                contentView?.offsetTopAndBottom(-totalDistanceY)
+                totalDistanceY = 0
+            }
         }, delayMillis)
     }
 
@@ -298,6 +311,7 @@ class DragRefreshLayout @JvmOverloads constructor(
         }, delayMillis)
     }
 
+
     /**
      * 向下拖拽
      * @param ev touch 对象
@@ -306,20 +320,15 @@ class DragRefreshLayout @JvmOverloads constructor(
         headerView?.let { head ->
             contentView?.let {
                 if (!canScrollVertically(it, -1) || touchTopFlag) {//内容view 滚动到顶部
-                    DragLogUtil.d("$lastDownY")
                     val moveY = ev.y.toInt()
-                    var distanceY = moveY - lastDownY
                     if (!touchTopFlag) {
-                        distanceY = 0 //避免绘制闪烁
-                        lastDownY = moveY
                         touchTopFlag = true
-                        notifyCallbacks(head, DRAG_UI_STATE_BEGIN, distanceY)
-                    } else
-                        notifyCallbacks(head, DRAG_UI_STATE_DRAGGING, distanceY)
-
-                    offsetTopY = distanceY
-
-                    requestLayout()
+                        if (lastMoveY == 0)
+                            lastMoveY = moveY
+                    }
+                    val distanceY = moveY - lastMoveY
+                    contentView?.offsetTopAndBottom(distanceY)
+                    headerView?.offsetTopAndBottom(distanceY)
                     return true
                 }
             }
@@ -333,25 +342,32 @@ class DragRefreshLayout @JvmOverloads constructor(
      */
     private fun dragDownFinish(ev: MotionEvent) {
         headerView?.let { head ->
-            contentView?.let {
-                if (!canScrollVertically(it, -1) || touchTopFlag) {
+            contentView?.let { content ->
+                if (touchTopFlag || content.top != 0) {
+
                     val moveY = ev.y.toInt()
                     val distanceY = moveY - lastDownY
-
-                    offsetTopY = if (offsetTopY > headerHeight) { //下拉不超过head height 则隐藏
-                        notifyCallbacks(head, DRAG_UI_STATE_FINISH, distanceY)
-                        headerHeight
+                    var isFinish = false
+                    val offsetY = if (content.top > headerHeight) {
+                        totalDistanceY = headerHeight
+                        isFinish = true
+                        content.top - headerHeight
                     } else {
-                        notifyCallbacks(head, DRAG_UI_STATE_CANCEL, distanceY)
-                        0
+                        totalDistanceY = 0
+                        content.top
                     }
 
+                    head.offsetTopAndBottom(-offsetY)
+                    content.offsetTopAndBottom(-offsetY)
                     if (touchTopFlag)
                         touchTopFlag = false
 
-                    if (distanceY > offsetTopY)
-                        startValueAnimator(true, distanceY, offsetTopY)
+                    if (isFinish) {
+                        notifyCallbacks(head, DRAG_UI_STATE_FINISH, distanceY)
+                    } else
+                        notifyCallbacks(head, DRAG_UI_STATE_CANCEL, distanceY)
 
+                    DragLogUtil.d("--->dragDownFinish $totalDistanceY ${headerView?.top} ${contentView?.top}")
                 }
             }
         }
@@ -453,7 +469,7 @@ class DragRefreshLayout @JvmOverloads constructor(
      */
     private fun startValueAnimator(isTop: Boolean, start: Int, end: Int, duration: Long = 500) {
         if (start != end) {
-            ValueAnimator.ofInt(start, end).apply {
+            valueAnimator = ValueAnimator.ofInt(start, end).apply {
                 this.addUpdateListener {
                     val value = it.animatedValue as Int
                     if (isTop) {

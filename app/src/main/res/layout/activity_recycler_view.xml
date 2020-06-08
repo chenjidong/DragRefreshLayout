@@ -28,7 +28,7 @@
             android:layout_height="match_parent"
             android:id="@+id/rv_content" />
 
-        <TextView
+      <!--  <TextView
             android:layout_width="match_parent"
             android:layout_height="100dp"
             android:background="#0F2FFF"
@@ -37,7 +37,7 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toTopOf="parent" />-->
     </com.cjd.dragrefresh.library.DragRefreshLayout>
 
 
