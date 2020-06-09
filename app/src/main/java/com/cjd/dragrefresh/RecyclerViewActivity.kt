@@ -8,9 +8,11 @@ import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.cjd.dragrefresh.library.DragDefaultHeader
 import com.cjd.dragrefresh.library.DragLogUtil
 import com.cjd.dragrefresh.library.DragRefreshLayout
 import com.cjd.dragrefresh.library.OnDragUICallback
+import com.google.android.material.appbar.AppBarLayout
 import kotlinx.android.synthetic.main.activity_recycler_view.*
 import kotlinx.android.synthetic.main.activity_scroll_view.layout
 import kotlinx.android.synthetic.main.recycler_item_view.view.*
@@ -33,6 +35,22 @@ class RecyclerViewActivity : AppCompatActivity(), OnDragUICallback {
         }
         rv_content.adapter = Adapter(this, list)
         layout.addDragUICallback(this)
+        layout.setHeader(DragDefaultHeader(this).apply {
+            layout.addDragUICallback(this)
+        })
+
+        app_bar_layout.addOnOffsetChangedListener(AppBarLayout.OnOffsetChangedListener { p0, p1 ->
+            val absoluteOffset = kotlin.math.abs(p1)
+            if (absoluteOffset == p0.totalScrollRange) {
+                layout?.isEnabled = false
+            } else if (absoluteOffset == 0)
+                layout?.isEnabled = true
+            else {
+
+                if (layout?.isEnabled == true)
+                    layout?.isEnabled = false
+            }
+        })
     }
 
 

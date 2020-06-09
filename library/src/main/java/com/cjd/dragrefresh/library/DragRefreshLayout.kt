@@ -74,6 +74,12 @@ class DragRefreshLayout @JvmOverloads constructor(
         if (child3 != null) {
             footerView = child3
         }
+
+        headerView?.let {
+            if (it is OnDragUICallback) {
+                dragUICallbacks.add(it)
+            }
+        }
     }
 
     override fun onDetachedFromWindow() {
@@ -181,7 +187,7 @@ class DragRefreshLayout @JvmOverloads constructor(
             }
             MotionEvent.ACTION_MOVE -> {
                 val moveY = ev.y.toInt()
-//                DragLogUtil.d("---> move $moveY lastMoveY $lastMoveY  top: ${headerView?.top} top: ${contentView?.top}")
+                DragLogUtil.d("---> move $moveY lastMoveY $lastMoveY  top: ${headerView?.top} top: ${contentView?.top}")
 
                 if (lastDownY < moveY) {
                     if (checkTouchDirection(true))
@@ -197,10 +203,11 @@ class DragRefreshLayout @JvmOverloads constructor(
 
             MotionEvent.ACTION_UP and MotionEvent.ACTION_CANCEL -> {
                 val moveY = ev.y.toInt()
-                dragDownFinish(ev)
+
                 if (lastDownY > moveY) {
                     dragUpFinish(ev)
                 }
+                return dragDownFinish(ev)
             }
         }
         return super.dispatchTouchEvent(ev)
@@ -208,10 +215,6 @@ class DragRefreshLayout @JvmOverloads constructor(
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         return super.onInterceptTouchEvent(ev)
-    }
-
-    override fun onTouchEvent(ev: MotionEvent): Boolean {
-        return super.onTouchEvent(ev)
     }
 
     /**
@@ -223,6 +226,7 @@ class DragRefreshLayout @JvmOverloads constructor(
     }
 
     /**
+     * TODO 添加后会导致header 无法进行正常偏移
      * 设置 header 默认高度为wrap_content
      * @param headerView 自定义view
      */
@@ -340,7 +344,7 @@ class DragRefreshLayout @JvmOverloads constructor(
      * 向下拖拽 完成 或者取消时 （触摸抬起） 拖拽范围超出 header 高度 则显示 否则动画隐藏
      * @param ev touch 对象
      */
-    private fun dragDownFinish(ev: MotionEvent) {
+    private fun dragDownFinish(ev: MotionEvent): Boolean {
         headerView?.let { head ->
             contentView?.let { content ->
                 if (touchTopFlag || content.top != 0) {
@@ -368,9 +372,11 @@ class DragRefreshLayout @JvmOverloads constructor(
                         notifyCallbacks(head, DRAG_UI_STATE_CANCEL, distanceY)
 
                     DragLogUtil.d("--->dragDownFinish $totalDistanceY ${headerView?.top} ${contentView?.top}")
+                    return true
                 }
             }
         }
+        return super.dispatchTouchEvent(ev)
     }
 
     /**
