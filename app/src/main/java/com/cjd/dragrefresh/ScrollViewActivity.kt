@@ -1,6 +1,7 @@
 package com.cjd.dragrefresh
 
 import android.os.Bundle
+import android.os.Handler
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import com.cjd.dragrefresh.library.DragRefreshLayout
@@ -22,9 +23,16 @@ class ScrollViewActivity : AppCompatActivity(), OnDragUICallback {
         layout.addDragUICallback(this)
     }
 
+    private fun getData() {
+
+        Handler().postDelayed({
+            layout?.completeRefresh(0, 0)
+        }, 3000)
+    }
+
     override fun onCallback(view: View, state: Int, moveY: Int) {
         if (state == DragRefreshLayout.DRAG_UI_STATE_FINISH)
-            layout?.completeRefresh()
+            getData()
 
     }
 }

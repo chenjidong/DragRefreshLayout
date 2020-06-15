@@ -4,7 +4,6 @@ package com.cjd.dragrefresh.library
 import android.content.Context
 import android.util.AttributeSet
 import android.view.LayoutInflater
-import android.view.View
 import android.view.animation.Animation
 import android.view.animation.LinearInterpolator
 import android.view.animation.RotateAnimation
@@ -22,7 +21,7 @@ class DragFooterHeader @JvmOverloads constructor(
     context: Context,
     attributeSet: AttributeSet? = null,
     defStyleAttr: Int = 0
-) : FrameLayout(context, attributeSet, defStyleAttr), OnDragUICallback {
+) : FrameLayout(context, attributeSet, defStyleAttr) {
 
     private val rotateAnimation: RotateAnimation by lazy {
         RotateAnimation(
@@ -67,50 +66,22 @@ class DragFooterHeader @JvmOverloads constructor(
         tvTitle = header.findViewById(R.id.drag_title)
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        ivLoadingLeft?.let {
+            it.clearAnimation()
+            it.startAnimation(rotateAnimation)
+        }
+        ivLoadingRight?.let {
+            it.clearAnimation()
+            it.startAnimation(rotateAnimationReversal)
+        }
+    }
+
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         ivLoadingLeft?.clearAnimation()
         ivLoadingRight?.clearAnimation()
     }
-
-    override fun onCallback(view: View, state: Int, moveY: Int) {
-        if (state == DragRefreshLayout.DRAG_UI_STATE_FINISH) {
-            if (!isRunning) {
-                tvTitle?.text = "正在加载"
-                isRunning = true
-                ivLoadingLeft?.let {
-                    it.clearAnimation()
-                    it.startAnimation(rotateAnimation)
-                }
-                ivLoadingRight?.let {
-                    it.clearAnimation()
-                    it.startAnimation(rotateAnimationReversal)
-                }
-            }
-        } else if (state == DragRefreshLayout.DRAG_UI_STATE_BEGIN) {
-            tvTitle?.text = "上拉刷新"
-            if (isRunning) {
-                isRunning = false
-                ivLoadingLeft?.clearAnimation()
-                ivLoadingRight?.clearAnimation()
-            }
-        } else if (state == DragRefreshLayout.DRAG_UI_STATE_DRAGGING) {
-            if (moveY >= view.measuredHeight / 2) {
-                var rotation = 360f / (view.measuredHeight) * moveY
-                ivLoadingLeft?.let {
-
-                    it.rotation = rotation
-                }
-                ivLoadingRight?.let {
-                    it.rotation = -rotation
-                }
-            }
-
-            if (moveY > view.measuredHeight) {
-                tvTitle?.text = "松开加载"
-            }
-        }
-    }
-
 
 }

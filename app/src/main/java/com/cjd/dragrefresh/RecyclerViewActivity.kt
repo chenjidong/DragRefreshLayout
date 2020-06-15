@@ -2,6 +2,7 @@ package com.cjd.dragrefresh
 
 import android.content.Context
 import android.os.Bundle
+import android.os.Handler
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -35,10 +36,7 @@ class RecyclerViewActivity : AppCompatActivity(), OnDragUICallback {
         }
         rv_content.adapter = Adapter(this, list)
         layout.addDragUICallback(this)
-        layout.setHeader(DragDefaultHeader(this).apply {
-            layout.addDragUICallback(this)
-        })
-
+        layout.setHeader(DragDefaultHeader(this))
         app_bar_layout.addOnOffsetChangedListener(AppBarLayout.OnOffsetChangedListener { p0, p1 ->
             val absoluteOffset = kotlin.math.abs(p1)
             if (absoluteOffset == p0.totalScrollRange) {
@@ -51,6 +49,13 @@ class RecyclerViewActivity : AppCompatActivity(), OnDragUICallback {
                     layout?.isEnabled = false
             }
         })
+    }
+
+    private fun getData() {
+
+        Handler().postDelayed({
+            layout?.completeRefresh(0, 0)
+        }, 3000)
     }
 
 
@@ -77,8 +82,11 @@ class RecyclerViewActivity : AppCompatActivity(), OnDragUICallback {
     }
 
     override fun onCallback(view: View, state: Int, moveY: Int) {
-        DragLogUtil.d("state:$state move:$moveY")
-        if (state == DragRefreshLayout.DRAG_UI_STATE_FINISH)
-            layout?.completeRefresh()
+
+        if (state == DragRefreshLayout.DRAG_UI_STATE_FINISH) {
+            DragLogUtil.d("state:$state move:$moveY")
+            getData()
+        }
+
     }
 }

@@ -40,7 +40,8 @@ class DragRefreshLayout @JvmOverloads constructor(
             field = value
         }
 
-    private val dragUICallbacks = mutableListOf<OnDragUICallback>()
+    private var dragUICallback: OnDragUICallback? = null
+
 
     private var headerHeight = 0
     private var footerHeight = 0
@@ -74,17 +75,11 @@ class DragRefreshLayout @JvmOverloads constructor(
         if (child3 != null) {
             footerView = child3
         }
-
-        headerView?.let {
-            if (it is OnDragUICallback) {
-                dragUICallbacks.add(it)
-            }
-        }
     }
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        dragUICallbacks.clear()
+        dragUICallback = null
         valueAnimator?.cancel()
     }
 
@@ -222,7 +217,7 @@ class DragRefreshLayout @JvmOverloads constructor(
      * @param onDragUICallback obj
      */
     fun addDragUICallback(onDragUICallback: OnDragUICallback) {
-        dragUICallbacks.add(onDragUICallback)
+        this.dragUICallback = onDragUICallback
     }
 
     /**
@@ -284,9 +279,8 @@ class DragRefreshLayout @JvmOverloads constructor(
         if (offsetBottomY != 0)
             completePullUpRefresh(delayMillis, duration)
 
-        if (totalDistanceY > 0)
-            completePullDownRefresh(delayMillis, duration)
-
+        if (totalDistanceY != 0)
+            completePullDownRefresh()
     }
 
     /**
@@ -294,14 +288,12 @@ class DragRefreshLayout @JvmOverloads constructor(
      * @param delayMillis 延迟时间 单位毫秒
      * @param duration 动画时间
      */
-    fun completePullDownRefresh(delayMillis: Long = 3000, duration: Long = 500) {
-        postDelayed({
-            if (totalDistanceY > 0) {
-                headerView?.offsetTopAndBottom(-totalDistanceY)
-                contentView?.offsetTopAndBottom(-totalDistanceY)
-                totalDistanceY = 0
-            }
-        }, delayMillis)
+    fun completePullDownRefresh() {
+        if (totalDistanceY != 0) {
+            headerView?.offsetTopAndBottom(-totalDistanceY)
+            contentView?.offsetTopAndBottom(-totalDistanceY)
+            totalDistanceY = 0
+        }
     }
 
     /**
@@ -333,6 +325,7 @@ class DragRefreshLayout @JvmOverloads constructor(
                     val distanceY = moveY - lastMoveY
                     contentView?.offsetTopAndBottom(distanceY)
                     headerView?.offsetTopAndBottom(distanceY)
+                    totalDistanceY += distanceY
                     return true
                 }
             }
@@ -347,18 +340,16 @@ class DragRefreshLayout @JvmOverloads constructor(
     private fun dragDownFinish(ev: MotionEvent): Boolean {
         headerView?.let { head ->
             contentView?.let { content ->
-                if (touchTopFlag || content.top != 0) {
+                if (touchTopFlag || totalDistanceY != 0) {
 
                     val moveY = ev.y.toInt()
                     val distanceY = moveY - lastDownY
                     var isFinish = false
-                    val offsetY = if (content.top > headerHeight) {
-                        totalDistanceY = headerHeight
+                    val offsetY = if (totalDistanceY > headerHeight) {
                         isFinish = true
-                        content.top - headerHeight
+                        totalDistanceY - headerHeight
                     } else {
-                        totalDistanceY = 0
-                        content.top
+                        totalDistanceY
                     }
 
                     head.offsetTopAndBottom(-offsetY)
@@ -367,11 +358,14 @@ class DragRefreshLayout @JvmOverloads constructor(
                         touchTopFlag = false
 
                     if (isFinish) {
+                        totalDistanceY -= offsetY
                         notifyCallbacks(head, DRAG_UI_STATE_FINISH, distanceY)
-                    } else
+                    } else {
+                        totalDistanceY = 0
                         notifyCallbacks(head, DRAG_UI_STATE_CANCEL, distanceY)
+                    }
 
-                    DragLogUtil.d("--->dragDownFinish $totalDistanceY ${headerView?.top} ${contentView?.top}")
+                    DragLogUtil.d("--->dragDownFinish $totalDistanceY ${headerView?.top} ${contentView?.top} $offsetY")
                     return true
                 }
             }
@@ -449,7 +443,7 @@ class DragRefreshLayout @JvmOverloads constructor(
             }
         } else {
             if (touchTopFlag) {//下拉动作成立后 再次上拉时取消下拉动作
-                completePullDownRefresh(0, 0)
+                completePullDownRefresh()
                 touchTopFlag = false
                 return true
             }
@@ -494,8 +488,6 @@ class DragRefreshLayout @JvmOverloads constructor(
      * 下/上拉刷新回调
      */
     private fun notifyCallbacks(view: View, state: Int, moveY: Int) {
-        dragUICallbacks.forEach {
-            it.onCallback(view, state, moveY)
-        }
+        dragUICallback?.onCallback(view, state, moveY)
     }
 }

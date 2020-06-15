@@ -2,6 +2,7 @@ package com.cjd.dragrefresh
 
 import android.graphics.Color
 import android.os.Bundle
+import android.os.Handler
 import android.view.Gravity
 import android.view.View
 import android.widget.TextView
@@ -11,6 +12,8 @@ import com.cjd.dragrefresh.library.DragFooterHeader
 import com.cjd.dragrefresh.library.DragRefreshLayout
 import com.cjd.dragrefresh.library.OnDragUICallback
 import kotlinx.android.synthetic.main.activity_demo.*
+import kotlinx.android.synthetic.main.activity_demo.layout
+import kotlinx.android.synthetic.main.activity_scroll_view.*
 
 /**
  * @author chenjidong
@@ -25,9 +28,7 @@ class DemoActivity : AppCompatActivity(), OnDragUICallback {
         setContentView(R.layout.activity_demo)
         layout.addDragUICallback(this)
 
-        layout.setHeader(DragDefaultHeader(this).apply {
-            layout.addDragUICallback(this)
-        })
+        layout.setHeader(DragDefaultHeader(this))
         layout.setContent(TextView(this).apply {
             this.isClickable = true
             this.setTextColor(Color.BLACK)
@@ -36,13 +37,18 @@ class DemoActivity : AppCompatActivity(), OnDragUICallback {
             this.text = "this is content view you can try slide down or up"
             this.setBackgroundColor(Color.RED)
         })
-        layout.setFooter(DragFooterHeader(this).apply {
-            layout.addDragUICallback(this)
-        })
+        layout.setFooter(DragFooterHeader(this))
+    }
+
+    private fun getData() {
+
+        Handler().postDelayed({
+            layout?.completeRefresh(0, 0)
+        }, 3000)
     }
 
     override fun onCallback(view: View, state: Int, moveY: Int) {
         if (state == DragRefreshLayout.DRAG_UI_STATE_FINISH)
-            layout?.completeRefresh()
+            getData()
     }
 }
